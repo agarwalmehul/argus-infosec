@@ -15,6 +15,8 @@ var _async = require('async');
 
 var _async2 = _interopRequireDefault(_async);
 
+var _ResponseBody = require('./ResponseBody');
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -104,24 +106,25 @@ var Argus = exports.Argus = function () {
     }
   }, {
     key: 'decodeJWT',
-    value: function decodeJWT(request) {
+    value: function decodeJWT(authToken) {
       var decode = this.decode;
 
       var encoding = 'base64';
-      var headers = request.headers;
-      var authorization = headers.authorization;
-
-      var authToken = authorization && authorization.split('Bearer ')[1];
-      request.token = authToken;
+      var error = void 0,
+          responseBody = void 0;
 
       if (!(authToken && authToken.length)) {
-        return new Error('Missing/Invalid Authorization in Request Header');
+        error = 'Missing/Invalid Authorization';
+        responseBody = new _ResponseBody.ResponseBody(401, error);
+        return responseBody;
       }
 
       var jwtArray = authToken && authToken.split('.');
 
       if (jwtArray.length !== 3) {
-        return new Error('Invalid JWT Token');
+        error = 'Invalid Authorization Token';
+        responseBody = new _ResponseBody.ResponseBody(400, error);
+        return responseBody;
       }
 
       var header = decode(jwtArray[0], encoding);
@@ -132,11 +135,15 @@ var Argus = exports.Argus = function () {
         header = JSON.parse(header);
         claims = JSON.parse(claims);
       } catch (e) {
-        return new Error('Invalid JWT Token');
+        error = 'Invalid Authorization Token';
+        responseBody = new _ResponseBody.ResponseBody(400, error);
+        return responseBody;
       }
 
       if (header.constructor.name !== 'Object' || claims.constructor.name !== 'Object') {
-        return new Error('Invalid JWT Header/Claims');
+        error = 'Invalid JWT Header/Claims';
+        responseBody = new _ResponseBody.ResponseBody(400, error);
+        return responseBody;
       }
 
       return { header: header, claims: claims, signature: signature };
@@ -151,9 +158,9 @@ var Argus = exports.Argus = function () {
       var header = JSON.stringify(decryptedJWT.header);
       var claims = JSON.stringify(decryptedJWT.claims);
       var signature = decryptedJWT.signature;
+
       var hash = encode(header + claims, encoding);
       hash = hmacSha256(hash, secret);
-
       return hash === signature;
     }
   }, {
@@ -207,16 +214,23 @@ var Argus = exports.Argus = function () {
 
       var _this = this;
       var decodeJWT = _this.decodeJWT;
+      var headers = request.headers,
+          query = request.query;
+      var authorization = headers.authorization;
+      var token = query.token;
+
+      var authToken = authorization && authorization.split('Bearer ')[1] || token;
+      request.token = authToken;
 
       var applySwitch = (_applySwitch = {}, _defineProperty(_applySwitch, SECURITY_TYPES.JWT, function () {
-        var jwt = decodeJWT(request);
+        var jwt = decodeJWT(authToken);
         var claims = jwt.claims;
 
 
         request.jwt = jwt;
         request.user = claims;
       }), _defineProperty(_applySwitch, SECURITY_TYPES.JWT_WITH_PAYLOAD_ENCRYPTION, function () {
-        var jwt = decodeJWT(request);
+        var jwt = decodeJWT(authToken);
         var claims = jwt.claims;
 
 
@@ -249,20 +263,27 @@ var Argus = exports.Argus = function () {
           body = request.body,
           _decryptPayload = request._decryptPayload;
 
-
-      if (jwt instanceof Error) {
-        return process.nextTick(function () {
-          return callback(jwt);
-        });
-      }
-
-      if (body instanceof Error) {
-        return process.nextTick(function () {
-          return callback(body);
-        });
-      }
+      var err = void 0,
+          responseBody = void 0;
 
       _async2.default.waterfall([
+      // Validate JWT and Body
+      function (next) {
+        if (jwt instanceof _ResponseBody.ResponseBody) {
+          return process.nextTick(function () {
+            return next(jwt);
+          });
+        }
+
+        if (body instanceof Error) {
+          err = body.toString();
+          responseBody = new _ResponseBody.ResponseBody(500, err, body);
+          return process.nextTick(function () {
+            return next(responseBody);
+          });
+        }
+      },
+
       // Get User's Secret Key
       function (next) {
         var id = user.id;
@@ -270,13 +291,22 @@ var Argus = exports.Argus = function () {
 
 
         if (!(getSecretKey instanceof Function)) {
-          var error = new Error('Error Getting User Secret Key');
+          err = 'Error Getting User Secret Key';
+          responseBody = new _ResponseBody.ResponseBody(500, err);
           return process.nextTick(function () {
-            return next(error);
+            return next(err);
           });
         }
 
-        getSecretKey(id, next);
+        getSecretKey(id, function (error, key) {
+          if (error) {
+            err = error.toString();
+            responseBody = new _ResponseBody.ResponseBody(500, err, error);
+            return next(responseBody);
+          }
+
+          next(null, key);
+        });
       },
 
       // Handle JWT
@@ -284,14 +314,44 @@ var Argus = exports.Argus = function () {
         var jwtValid = verifyJWT(jwt, key);
 
         if (!jwtValid) {
-          var error = new Error('Unauthorized Access - JWT Signature does not match');
+          err = 'JWT Tampered, Signature does not match';
+          responseBody = new _ResponseBody.ResponseBody(400, err);
           return process.nextTick(function () {
-            return next(error);
+            return next(responseBody);
           });
         }
 
         request.secretKey = key;
         return process.nextTick(next);
+      },
+
+      // Handle Payload Decryption Key
+      function (next) {
+        if (_decryptPayload !== true) {
+          return process.nextTick(next);
+        }
+
+        var getEncryptionKey = options.getEncryptionKey;
+        var _request$token = request.token,
+            token = _request$token === undefined ? '' : _request$token;
+
+        var key = token && token.substring(16, 48);
+        request._encryptionKey = key;
+
+        if (getEncryptionKey instanceof Function) {
+          return getEncryptionKey(function (error, key) {
+            if (error) {
+              err = 'Error Fetching Encryption Key';
+              responseBody = new _ResponseBody.ResponseBody(500, err);
+              return next(responseBody);
+            }
+
+            request._encryptionKey = key;
+            next();
+          });
+        }
+
+        process.nextTick(next);
       },
 
       // Handle Payload Decryption
@@ -301,16 +361,19 @@ var Argus = exports.Argus = function () {
         }
 
         var body = request.body,
-            _request$token = request.token,
-            token = _request$token === undefined ? '' : _request$token;
+            _request$_encryptionK = request._encryptionKey,
+            _encryptionKey = _request$_encryptionK === undefined ? '' : _request$_encryptionK;
+
         var _body$payload = body.payload,
             payload = _body$payload === undefined ? '' : _body$payload;
 
-        var _body = decryptPayload(payload, token);
+        var _body = decryptPayload(payload, _encryptionKey);
+
         if (typeof _body === 'string') {
-          var error = new Error(_body);
+          err = _body;
+          responseBody = new _ResponseBody.ResponseBody(400, err);
           return process.nextTick(function () {
-            return next(error);
+            return next(err);
           });
         } else {
           request.body = _body && Object.assign({}, body, _body) || {};
@@ -318,7 +381,12 @@ var Argus = exports.Argus = function () {
             return next();
           });
         }
-      }], callback);
+      }], function (error) {
+        if (error) {
+          response.body = error;
+        }
+        callback();
+      });
     }
   }, {
     key: 'hmacSha256',

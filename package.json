@@ -14,8 +14,8 @@
     "url": "git+https://github.com/agarwalmehul/argus-infosec.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Mehul Agarwal <agarwalmehul92@gmail.com>",
+  "license": "GNU",
   "bugs": {
     "url": "https://github.com/agarwalmehul/argus-infosec/issues"
   },

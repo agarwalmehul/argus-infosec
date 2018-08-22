@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import async from 'async'
+import { ResponseBody } from './ResponseBody'
 
 const VERSION = '0.1.0'
 const DEFAULT_PASSWORD_SALT = 'Im Batman!'
@@ -70,22 +71,23 @@ export class Argus {
     return [jwtHeader, jwtClaims, jwtSignature].join('.')
   }
 
-  decodeJWT (request) {
+  decodeJWT (authToken) {
     const { decode } = this
     const encoding = 'base64'
-    const { headers } = request
-    const { authorization } = headers
-    const authToken = authorization && authorization.split('Bearer ')[1]
-    request.token = authToken
+    let error, responseBody;
 
     if (!(authToken && authToken.length)) {
-      return new Error('Missing/Invalid Authorization in Request Header')
+      error = 'Missing/Invalid Authorization'
+      responseBody = new ResponseBody(401, error)
+      return responseBody
     }
 
     let jwtArray = authToken && authToken.split('.')
 
     if (jwtArray.length !== 3) {
-      return new Error('Invalid JWT Token')
+      error = 'Invalid Authorization Token'
+      responseBody = new ResponseBody(400, error)
+      return responseBody
     }
 
     let header = decode(jwtArray[0], encoding)
@@ -96,11 +98,15 @@ export class Argus {
       header = JSON.parse(header)
       claims = JSON.parse(claims)
     } catch (e) {
-      return new Error('Invalid JWT Token')
+      error = 'Invalid Authorization Token'
+      responseBody = new ResponseBody(400, error)
+      return responseBody
     }
 
     if (header.constructor.name !== 'Object' || claims.constructor.name !== 'Object') {
-      return new Error('Invalid JWT Header/Claims')
+      error = 'Invalid JWT Header/Claims'
+      responseBody = new ResponseBody(400, error)
+      return responseBody
     }
 
     return { header, claims, signature }
@@ -112,9 +118,9 @@ export class Argus {
     const header = JSON.stringify(decryptedJWT.header)
     const claims = JSON.stringify(decryptedJWT.claims)
     const signature = decryptedJWT.signature
+
     let hash = encode((header + claims), encoding)
     hash = hmacSha256(hash, secret)
-
     return hash === signature
   }
 
@@ -155,16 +161,23 @@ export class Argus {
   applySecurity (securityType, request, response, callback) {
     const _this = this
     const { decodeJWT } = _this
+    const { headers, query } = request
+    const { authorization } = headers
+    const { token } = query
+    const authToken = (authorization && authorization.split('Bearer ')[1]) || token
+    request.token = authToken
+
     const applySwitch = {
       [SECURITY_TYPES.JWT]: () => {
-        const jwt = decodeJWT(request)
+        const jwt = decodeJWT(authToken)
         const { claims } = jwt
 
         request.jwt = jwt
         request.user = claims
       },
+
       [SECURITY_TYPES.JWT_WITH_PAYLOAD_ENCRYPTION]: () => {
-        const jwt = decodeJWT(request)
+        const jwt = decodeJWT(authToken)
         const { claims } = jwt
 
         request.jwt = jwt
@@ -183,27 +196,42 @@ export class Argus {
     const _this = this
     const { verifyJWT, decryptPayload } = _this
     const { jwt, user = {}, body, _decryptPayload } = request
-
-    if (jwt instanceof Error) {
-      return process.nextTick(() => callback(jwt))
-    }
-
-    if (body instanceof Error) {
-      return process.nextTick(() => callback(body))
-    }
+    let err, responseBody;
 
     async.waterfall([
+      // Validate JWT and Body
+      next => {
+        if (jwt instanceof ResponseBody) {
+          return process.nextTick(() => next(jwt))
+        }
+
+        if (body instanceof Error) {
+          err = body.toString()
+          responseBody = new ResponseBody(500, err, body)
+          return process.nextTick(() => next(responseBody))
+        }
+      },
+
       // Get User's Secret Key
       next => {
         const { id } = user
         let { getSecretKey } = options
 
         if (!(getSecretKey instanceof Function)) {
-          const error = new Error('Error Getting User Secret Key')
-          return process.nextTick(() => next(error))
+          err = 'Error Getting User Secret Key'
+          responseBody = new ResponseBody(500, err)
+          return process.nextTick(() => next(err))
         }
 
-        getSecretKey(id, next)
+        getSecretKey(id, (error, key) => {
+          if (error) {
+            err = error.toString()
+            responseBody = new ResponseBody(500, err, error)
+            return next(responseBody)
+          }
+
+          next(null, key)
+        })
       },
 
       // Handle JWT
@@ -211,30 +239,61 @@ export class Argus {
         const jwtValid = verifyJWT(jwt, key)
 
         if (!jwtValid) {
-          const error = new Error('Unauthorized Access - JWT Signature does not match')
-          return process.nextTick(() => next(error))
+          err = 'JWT Tampered, Signature does not match'
+          responseBody = new ResponseBody(400, err)
+          return process.nextTick(() => next(responseBody))
         }
 
         request.secretKey = key
         return process.nextTick(next)
       },
 
+      // Handle Payload Decryption Key
+      next => {
+        if (_decryptPayload !== true) { return process.nextTick(next) }
+
+        let { getEncryptionKey } = options
+        const { token = '' } = request
+        const key = token && token.substring(16, 48)
+        request._encryptionKey = key
+
+        if (getEncryptionKey instanceof Function) {
+          return getEncryptionKey((error, key) => {
+            if (error) {
+              err = 'Error Fetching Encryption Key'
+              responseBody = new ResponseBody(500, err)
+              return next(responseBody)
+            }
+
+            request._encryptionKey = key
+            next()
+          })
+        }
+
+        process.nextTick(next)
+      },
+
       // Handle Payload Decryption
       next => {
         if (_decryptPayload !== true) { return process.nextTick(next) }
 
-        const { body, token = '' } = request
+        const { body, _encryptionKey = '' } = request
         let { payload = '' } = body
-        let _body = decryptPayload(payload, token)
+        let _body = decryptPayload(payload, _encryptionKey)
+
         if (typeof _body === 'string') {
-          const error = new Error(_body)
-          return process.nextTick(() => next(error))
+          err = _body
+          responseBody = new ResponseBody(400, err)
+          return process.nextTick(() => next(err))
         } else {
           request.body = (_body && Object.assign({}, body, _body)) || {}
           return process.nextTick(() => next())
         }
       }
-    ], callback)
+    ], error => {
+      if (error) { response.body = error }
+      callback()
+    })
   }
 
   hmacSha256 (plainText = '', salt = '') {

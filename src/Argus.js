@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.0'
+const VERSION = '0.1.1'
 const DEFAULT_PASSWORD_SALT = 'Im Batman!'
 const IV_LENGTH = 16
 const SECURITY_TYPES = {

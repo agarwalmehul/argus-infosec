@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.1'
+const VERSION = '0.1.2'
 const DEFAULT_PASSWORD_SALT = 'Im Batman!'
 const IV_LENGTH = 16
 const SECURITY_TYPES = {
@@ -74,7 +74,7 @@ export class Argus {
   decodeJWT (authToken) {
     const { decode } = this
     const encoding = 'base64'
-    let error, responseBody;
+    let error, responseBody
 
     if (!(authToken && authToken.length)) {
       error = 'Missing/Invalid Authorization'
@@ -196,7 +196,7 @@ export class Argus {
     const _this = this
     const { verifyJWT, decryptPayload } = _this
     const { jwt, user = {}, body, _decryptPayload } = request
-    let err, responseBody;
+    let err, responseBody
 
     async.waterfall([
       // Validate JWT and Body

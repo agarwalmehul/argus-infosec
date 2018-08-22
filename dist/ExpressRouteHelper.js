@@ -105,7 +105,7 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
       var encryptionKey = response._encryptionKey || request._encryptionKey;
       var token = response.token || request.token;
 
-      var payload = aegis.encryptPayload(responseBody, token);
+      var payload = argus.encryptPayload(responseBody, encryptionKey);
       var body = { token: token, payload: payload };
       response.status(200).json(body);
     }

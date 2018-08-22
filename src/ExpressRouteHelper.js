@@ -4,7 +4,7 @@ import { ResponseBody } from './ResponseBody'
 const argus = new Argus()
 
 export class ExpressRouteHelper {
-  constructor({ AuthModel, SUPERADMIN_ROLE }) {
+  constructor ({ AuthModel, SUPERADMIN_ROLE }) {
     this.AuthModel = AuthModel
     this.SUPERADMIN_ROLE = SUPERADMIN_ROLE
 
@@ -59,17 +59,17 @@ export class ExpressRouteHelper {
     process.nextTick(next)
   }
 
-  sendResponse(request, response, next) {
+  sendResponse (request, response, next) {
     const { body } = response
     response.status(body.statusCode).json(body)
   }
 
-  sendEncryptedResponse(request, response, next) {
+  sendEncryptedResponse (request, response, next) {
     const responseBody = response.body
     const encryptionKey = response._encryptionKey || request._encryptionKey
     const token = response.token || request.token
 
-    const payload = aegis.encryptPayload(responseBody, token)
+    const payload = argus.encryptPayload(responseBody, encryptionKey)
     const body = { token, payload }
     response.status(200).json(body)
   }

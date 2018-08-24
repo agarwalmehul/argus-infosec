@@ -14,7 +14,7 @@ export class ExpressRouteHelper {
     this.validateSecurity = this.validateSecurity.bind(this)
     this.manageSelfAccess = this.manageSelfAccess.bind(this)
     this.manageSuperadminAccess = this.manageSuperadminAccess.bind(this)
-    this.responseBody = this.responseBody.bind(this)
+    this.sendResponse = this.sendResponse.bind(this)
     this.sendEncryptedResponse = this.sendEncryptedResponse.bind(this)
   }
 

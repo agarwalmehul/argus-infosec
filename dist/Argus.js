@@ -23,7 +23,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var VERSION = '0.1.6';
+var VERSION = '0.1.8';
 var SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -44,7 +44,9 @@ var DEFAULT_CONFIG = {
   IV_LENGTH: 16,
   ENCODING: 'base64',
   KEY_LENGTH: 16,
-  KEY_FORMAT: 'base64'
+  KEY_FORMAT: 'base64',
+  TOKEN_KEY_START_INDEX: 40,
+  TOKEN_KEY_END_INDEX: 72
 };
 
 exports.ARGUS_SECURITY_TYPES = SECURITY_TYPES;
@@ -300,7 +302,8 @@ var Argus = exports.Argus = function () {
 
       var _this = this;
       var verifyJWT = _this.verifyJWT,
-          decryptPayload = _this.decryptPayload;
+          decryptPayload = _this.decryptPayload,
+          _getKeyFromToken = _this._getKeyFromToken;
       var jwt = request.jwt,
           _request$user = request.user,
           user = _request$user === undefined ? {} : _request$user,
@@ -379,7 +382,7 @@ var Argus = exports.Argus = function () {
         var _request$token = request.token,
             token = _request$token === undefined ? '' : _request$token;
 
-        var key = token && token.substring(16, 48);
+        var key = _getKeyFromToken(token);
         request._encryptionKey = key;
 
         if (getEncryptionKey instanceof Function) {
@@ -590,13 +593,30 @@ var Argus = exports.Argus = function () {
 
       credentialParts = this.decode(token, encoding);
       credentialParts = credentialParts.split(':');
-      if (credentials.length !== 2) {
+      if (credentialParts.length !== 2) {
         error = new _ResponseBody.ResponseBody(400, 'Invalid Auth Token');
       }
 
       credentials = (_credentials = {}, _defineProperty(_credentials, USERNAME_PROP, credentialParts[0]), _defineProperty(_credentials, PASSWORD_PROP, credentialParts[1]), _credentials);
 
       return error || credentials;
+    }
+  }, {
+    key: '_getKeyFromToken',
+    value: function _getKeyFromToken() {
+      var token = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+      var CONFIG = this.CONFIG;
+      var TOKEN_KEY_START_INDEX = CONFIG.TOKEN_KEY_START_INDEX,
+          TOKEN_KEY_END_INDEX = CONFIG.TOKEN_KEY_END_INDEX;
+
+      var key = '';
+
+      if (!token) {
+        return key;
+      }
+
+      key = token.substring(TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX);
+      return key;
     }
   }], [{
     key: 'SECURITY_TYPES',

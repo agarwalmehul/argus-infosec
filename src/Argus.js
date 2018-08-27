@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.7'
+const VERSION = '0.1.8'
 const SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -225,7 +225,7 @@ export class Argus {
 
   validateSecurity (options = {}, request, response, callback) {
     const _this = this
-    const { verifyJWT, decryptPayload } = _this
+    const { verifyJWT, decryptPayload, _getKeyFromToken } = _this
     const { jwt, user = {}, body, _decryptPayload } = request
     let err, responseBody
 
@@ -285,9 +285,7 @@ export class Argus {
 
         let { getEncryptionKey } = options
         const { token = '' } = request
-        const { CONFIG } = _this
-        const { TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX } = CONFIG
-        const key = token && token.substring(TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX)
+        const key = _getKeyFromToken(token)
         request._encryptionKey = key
 
         if (getEncryptionKey instanceof Function) {
@@ -452,5 +450,16 @@ export class Argus {
     }
 
     return error || credentials
+  }
+
+  _getKeyFromToken(token = '') {
+    const { CONFIG } = this
+    const { TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX } = CONFIG
+    let key = ''
+
+    if (!token) { return key }
+
+    key = token.substring(TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX)
+    return key
   }
 }

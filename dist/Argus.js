@@ -23,7 +23,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var VERSION = '0.1.5';
+var VERSION = '0.1.6';
 var SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -515,10 +515,13 @@ var Argus = exports.Argus = function () {
       var _extractAuthToken = this._extractAuthToken,
           _decodeAuthToken = this._decodeAuthToken;
 
+      var authTypeValues = Object.keys(AUTH_TYPES).map(function (type) {
+        return AUTH_TYPES[type];
+      });
       var error = void 0;
 
-      if (!AUTH_TYPES[authType]) {
-        error = new _ResponseBody.ResponseBody(400, 'Invalid \'authType\' for Decoding');
+      if (authTypeValues.indexOf(authType) === -1) {
+        error = new _ResponseBody.ResponseBody(400, "Invalid 'authType' for Decoding");
         return error;
       }
 

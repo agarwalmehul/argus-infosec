@@ -110,9 +110,15 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
   }, {
     key: 'sendEncryptedResponse',
     value: function sendEncryptedResponse(request, response, next) {
+      var sendResponse = this.sendResponse;
+
       var responseBody = response.body;
       var encryptionKey = response._encryptionKey || request._encryptionKey;
       var token = response.token || request.token;
+
+      if (!token) {
+        return sendResponse(request, response, next);
+      }
 
       var payload = this.argus.encryptPayload(responseBody, encryptionKey);
       var body = { token: token, payload: payload };

@@ -75,9 +75,12 @@ export class ExpressRouteHelper {
   }
 
   sendEncryptedResponse (request, response, next) {
+    const { sendResponse } = this
     const responseBody = response.body
     const encryptionKey = response._encryptionKey || request._encryptionKey
     const token = response.token || request.token
+
+    if (!token) { return sendResponse(request, response, next) }
 
     const payload = this.argus.encryptPayload(responseBody, encryptionKey)
     const body = { token, payload }

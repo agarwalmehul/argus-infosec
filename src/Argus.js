@@ -380,10 +380,11 @@ export class Argus {
 
   decodeAuth (authType, auth) {
     const { _extractAuthToken, _decodeAuthToken } = this
+    const authTypeValues = Object.keys(AUTH_TYPES).map(type => AUTH_TYPES[type])
     let error
 
-    if (!AUTH_TYPES[authType]) {
-      error = new ResponseBody(400, 'Invalid \'authType\' for Decoding')
+    if (authTypeValues.indexOf(authType) === -1) {
+      error = new ResponseBody(400, "Invalid 'authType' for Decoding")
       return error
     }
 

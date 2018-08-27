@@ -1,36 +1,45 @@
-import { Argus, ARGUS_SECURITY_TYPES } from './Argus'
+import { Argus, ARGUS_SECURITY_TYPES, ARGUS_AUTH_TYPES } from './Argus'
 import { ResponseBody } from './ResponseBody'
 
-const argus = new Argus()
+const DEFAULT_CONFIG = {
+  SUPERADMIN_ROLE: 'SUPERADMIN',
+  USERNAME_PROP: 'username',
+  PASSWORD_PROP: 'password'
+}
 
 export class ExpressRouteHelper {
-  constructor ({ AuthModel, SUPERADMIN_ROLE }) {
+  constructor (AuthModel, CONFIG = {}) {
     this.AuthModel = AuthModel
-    this.SUPERADMIN_ROLE = SUPERADMIN_ROLE
+    this.CONFIG = Object.assign({}, DEFAULT_CONFIG, CONFIG)
+    this.argus = new Argus(this.CONFIG)
 
     // Method Hard-binding
     this.applyJWT = this.applyJWT.bind(this)
-    this.applyJWTandEncryption = this.applyJWTandEncryption.bind(this)
+    this.applyJWTandDecryptPayload = this.applyJWTandDecryptPayload.bind(this)
     this.validateSecurity = this.validateSecurity.bind(this)
+
     this.manageSelfAccess = this.manageSelfAccess.bind(this)
     this.manageSuperadminAccess = this.manageSuperadminAccess.bind(this)
+
     this.sendResponse = this.sendResponse.bind(this)
     this.sendEncryptedResponse = this.sendEncryptedResponse.bind(this)
+
+    this.decodeBasicAuth = this.decodeBasicAuth.bind(this)
   }
 
   applyJWT (request, response, next) {
-    argus.applySecurity(ARGUS_SECURITY_TYPES.JWT, request, response, next)
+    this.argus.applySecurity(ARGUS_SECURITY_TYPES.JWT, request, response, next)
   }
 
-  applyJWTandEncryption (request, response, next) {
-    argus.applySecurity(ARGUS_SECURITY_TYPES.JWT_WITH_PAYLOAD_ENCRYPTION, request, response, next)
+  applyJWTandDecryptPayload (request, response, next) {
+    this.argus.applySecurity(ARGUS_SECURITY_TYPES.JWT_WITH_PAYLOAD_DECRYPTION, request, response, next)
   }
 
   validateSecurity (request, response, next) {
     const { AuthModel } = this
     const { getSecretKey } = AuthModel
     const options = { getSecretKey }
-    argus.validateSecurity(options, request, response, next)
+    this.argus.validateSecurity(options, request, response, next)
   }
 
   manageSelfAccess (request, response, next) {
@@ -46,7 +55,8 @@ export class ExpressRouteHelper {
   }
 
   manageSuperadminAccess (request, response, next) {
-    const { SUPERADMIN_ROLE } = this
+    const { CONFIG } = this
+    const { SUPERADMIN_ROLE } = CONFIG
     const { user = {} } = request
     const { role = '', roles = [] } = user
     let isSuperAdmin = role === SUPERADMIN_ROLE || roles.indexOf(SUPERADMIN_ROLE) > -1
@@ -69,8 +79,17 @@ export class ExpressRouteHelper {
     const encryptionKey = response._encryptionKey || request._encryptionKey
     const token = response.token || request.token
 
-    const payload = argus.encryptPayload(responseBody, encryptionKey)
+    const payload = this.argus.encryptPayload(responseBody, encryptionKey)
     const body = { token, payload }
     response.status(200).json(body)
+  }
+
+  decodeBasicAuth (request, response, next) {
+    const { headers, body } = request
+    const { authorization } = headers
+    const authType = ARGUS_AUTH_TYPES.BASIC
+    const credentials = this.argus.decodeAuth(authType, authorization)
+    request.body = Object.assign(body, credentials)
+    process.nextTick(next)
   }
 }

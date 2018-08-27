@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.8'
+const VERSION = '0.1.9'
 const SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -62,6 +62,7 @@ export class Argus {
     this._extractAuthToken = this._extractAuthToken.bind(this)
     this._decodeAuthToken = this._decodeAuthToken.bind(this)
     this._decodeBasicAuthToken = this._decodeBasicAuthToken.bind(this)
+    this._getKeyFromToken = this._getKeyFromToken.bind(this)
   }
 
   static get SECURITY_TYPES () { return SECURITY_TYPES }

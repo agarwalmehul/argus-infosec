@@ -23,7 +23,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var VERSION = '0.1.8';
+var VERSION = '0.1.9';
 var SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -87,6 +87,7 @@ var Argus = exports.Argus = function () {
     this._extractAuthToken = this._extractAuthToken.bind(this);
     this._decodeAuthToken = this._decodeAuthToken.bind(this);
     this._decodeBasicAuthToken = this._decodeBasicAuthToken.bind(this);
+    this._getKeyFromToken = this._getKeyFromToken.bind(this);
   }
 
   _createClass(Argus, [{

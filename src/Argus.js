@@ -433,7 +433,7 @@ export class Argus {
     const { CONFIG } = this
     const { USERNAME_PROP, PASSWORD_PROP } = CONFIG
     let error, credentialParts, credentials
-    const encoding = CONFIG.ENCODING
+    const encoding = 'base64'
 
     credentialParts = this.decode(token, encoding)
     credentialParts = credentialParts.split(':')

@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.9'
+const VERSION = '0.1.10'
 const SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -71,7 +71,7 @@ export class Argus {
   generateKey (length = 16, format = '') {
     const { CONFIG } = this
     const thisLength = length || CONFIG.KEY_LENGTH
-    const thisFormat = length || CONFIG.KEY_FORMAT
+    const thisFormat = format || CONFIG.KEY_FORMAT
     return crypto.randomBytes(thisLength).toString(thisFormat)
   }
 

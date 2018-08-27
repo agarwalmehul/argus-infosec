@@ -1,6 +1,6 @@
 {
   "name": "argus-infosec",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Information Security Middleware for API Servers",
   "main": "dist/index.js",
   "scripts": {

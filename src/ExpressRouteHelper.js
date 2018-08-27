@@ -93,7 +93,7 @@ export class ExpressRouteHelper {
     const { authorization } = headers
     const authType = ARGUS_AUTH_TYPES.BASIC
     const credentials = this.argus.decodeAuth(authType, authorization)
-    request.body = Object.assign(body, credentials)
+    request.body = credentials
     process.nextTick(next)
   }
 }

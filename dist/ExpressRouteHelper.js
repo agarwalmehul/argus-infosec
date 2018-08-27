@@ -13,37 +13,45 @@ var _ResponseBody = require('./ResponseBody');
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var argus = new _Argus.Argus();
+var DEFAULT_CONFIG = {
+  SUPERADMIN_ROLE: 'SUPERADMIN',
+  USERNAME_PROP: 'username',
+  PASSWORD_PROP: 'password'
+};
 
 var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
-  function ExpressRouteHelper(_ref) {
-    var AuthModel = _ref.AuthModel,
-        SUPERADMIN_ROLE = _ref.SUPERADMIN_ROLE;
+  function ExpressRouteHelper(AuthModel) {
+    var CONFIG = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
     _classCallCheck(this, ExpressRouteHelper);
 
     this.AuthModel = AuthModel;
-    this.SUPERADMIN_ROLE = SUPERADMIN_ROLE;
+    this.CONFIG = Object.assign({}, DEFAULT_CONFIG, CONFIG);
+    this.argus = new _Argus.Argus(this.CONFIG);
 
     // Method Hard-binding
     this.applyJWT = this.applyJWT.bind(this);
-    this.applyJWTandEncryption = this.applyJWTandEncryption.bind(this);
+    this.applyJWTandDecryptPayload = this.applyJWTandDecryptPayload.bind(this);
     this.validateSecurity = this.validateSecurity.bind(this);
+
     this.manageSelfAccess = this.manageSelfAccess.bind(this);
     this.manageSuperadminAccess = this.manageSuperadminAccess.bind(this);
-    this.responseBody = this.responseBody.bind(this);
+
+    this.sendResponse = this.sendResponse.bind(this);
     this.sendEncryptedResponse = this.sendEncryptedResponse.bind(this);
+
+    this.decodeBasicAuth = this.decodeBasicAuth.bind(this);
   }
 
   _createClass(ExpressRouteHelper, [{
     key: 'applyJWT',
     value: function applyJWT(request, response, next) {
-      argus.applySecurity(_Argus.ARGUS_SECURITY_TYPES.JWT, request, response, next);
+      this.argus.applySecurity(_Argus.ARGUS_SECURITY_TYPES.JWT, request, response, next);
     }
   }, {
-    key: 'applyJWTandEncryption',
-    value: function applyJWTandEncryption(request, response, next) {
-      argus.applySecurity(_Argus.ARGUS_SECURITY_TYPES.JWT_WITH_PAYLOAD_ENCRYPTION, request, response, next);
+    key: 'applyJWTandDecryptPayload',
+    value: function applyJWTandDecryptPayload(request, response, next) {
+      this.argus.applySecurity(_Argus.ARGUS_SECURITY_TYPES.JWT_WITH_PAYLOAD_DECRYPTION, request, response, next);
     }
   }, {
     key: 'validateSecurity',
@@ -52,7 +60,7 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
       var getSecretKey = AuthModel.getSecretKey;
 
       var options = { getSecretKey: getSecretKey };
-      argus.validateSecurity(options, request, response, next);
+      this.argus.validateSecurity(options, request, response, next);
     }
   }, {
     key: 'manageSelfAccess',
@@ -74,7 +82,8 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
   }, {
     key: 'manageSuperadminAccess',
     value: function manageSuperadminAccess(request, response, next) {
-      var SUPERADMIN_ROLE = this.SUPERADMIN_ROLE;
+      var CONFIG = this.CONFIG;
+      var SUPERADMIN_ROLE = CONFIG.SUPERADMIN_ROLE;
       var _request$user2 = request.user,
           user = _request$user2 === undefined ? {} : _request$user2;
       var _user$role = user.role,
@@ -105,9 +114,21 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
       var encryptionKey = response._encryptionKey || request._encryptionKey;
       var token = response.token || request.token;
 
-      var payload = argus.encryptPayload(responseBody, encryptionKey);
+      var payload = this.argus.encryptPayload(responseBody, encryptionKey);
       var body = { token: token, payload: payload };
       response.status(200).json(body);
+    }
+  }, {
+    key: 'decodeBasicAuth',
+    value: function decodeBasicAuth(request, response, next) {
+      var headers = request.headers,
+          body = request.body;
+      var authorization = headers.authorization;
+
+      var authType = _Argus.ARGUS_AUTH_TYPES.BASIC;
+      var credentials = this.argus.decodeAuth(authType, authorization);
+      request.body = Object.assign(body, credentials);
+      process.nextTick(next);
     }
   }]);
 

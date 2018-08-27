@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.Argus = exports.ARGUS_SECURITY_TYPES = undefined;
+exports.Argus = exports.ARGUS_AUTH_TYPES = exports.ARGUS_SECURITY_TYPES = undefined;
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -23,21 +23,40 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var VERSION = '0.1.2';
-var DEFAULT_PASSWORD_SALT = 'Im Batman!';
-var IV_LENGTH = 16;
+var VERSION = '0.1.4';
 var SECURITY_TYPES = {
   JWT: Symbol('JWT'),
-  JWT_WITH_PAYLOAD_ENCRYPTION: Symbol('JWT_WITH_PAYLOAD_ENCRYPTION')
+  JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
+};
+var AUTH_TYPES = {
+  BASIC: Symbol('BASIC')
+};
+var AUTH_SPLITERS = ['Basic ', 'Bearer '];
+var DEFAULT_CONFIG = {
+  USERNAME_PROP: 'username',
+  PASSWORD_PROP: 'password',
+  PASSWORD_SALT: 'Im Batman!',
+  JWT_SECRET: 'Im Batman!',
+  ENCRYPTION_SECRET: '0000000000000000',
+  ENCRYPTION_ALGORITHM: 'aes-256-cbc',
+  BUFFER_FORMAT: 'hex',
+  IV: '0000000000000000',
+  IV_LENGTH: 16,
+  ENCODING: 'base64',
+  KEY_LENGTH: 16,
+  KEY_FORMAT: 'base64'
 };
 
 exports.ARGUS_SECURITY_TYPES = SECURITY_TYPES;
+exports.ARGUS_AUTH_TYPES = AUTH_TYPES;
 
 var Argus = exports.Argus = function () {
   function Argus() {
     var config = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
     _classCallCheck(this, Argus);
+
+    this.CONFIG = Object.assign({}, DEFAULT_CONFIG, config);
 
     // Method Hard-Binding
     this.generateKey = this.generateKey.bind(this);
@@ -61,38 +80,59 @@ var Argus = exports.Argus = function () {
 
     this.encode = this.encode.bind(this);
     this.decode = this.decode.bind(this);
+
+    this.decodeAuth = this.decodeAuth.bind(this);
+    this._extractAuthToken = this._extractAuthToken.bind(this);
+    this._decodeAuthToken = this._decodeAuthToken.bind(this);
+    this._decodeBasicAuthToken = this._decodeBasicAuthToken.bind(this);
   }
 
   _createClass(Argus, [{
     key: 'generateKey',
     value: function generateKey() {
       var length = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 16;
-      var format = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'base64';
+      var format = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var CONFIG = this.CONFIG;
 
-      return _crypto2.default.randomBytes(length).toString(format);
+      var thisLength = length || CONFIG.KEY_LENGTH;
+      var thisFormat = length || CONFIG.KEY_FORMAT;
+      return _crypto2.default.randomBytes(thisLength).toString(thisFormat);
     }
   }, {
     key: 'encryptPassword',
-    value: function encryptPassword(password, salt) {
-      var hmacSha256 = this.hmacSha256;
+    value: function encryptPassword() {
+      var password = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+      var salt = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var CONFIG = this.CONFIG,
+          hmacSha256 = this.hmacSha256;
 
-      return hmacSha256(password, salt || DEFAULT_PASSWORD_SALT);
+      var thisSalt = salt || CONFIG.DEFAULT_PASSWORD_SALT;
+      return hmacSha256(password, thisSalt);
     }
   }, {
     key: 'verifyPassword',
-    value: function verifyPassword(password, hash, salt) {
-      var encryptPassword = this.encryptPassword;
+    value: function verifyPassword() {
+      var password = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+      var hash = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var salt = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '';
+      var CONFIG = this.CONFIG,
+          encryptPassword = this.encryptPassword;
 
-      var passwordHash = encryptPassword(password, salt);
+      var thisSalt = salt || CONFIG.PASSWORD_SALT;
+      var passwordHash = encryptPassword(password, thisSalt);
       return passwordHash === hash;
     }
   }, {
     key: 'createJWT',
-    value: function createJWT(claims, secret) {
-      var encode = this.encode,
+    value: function createJWT() {
+      var claims = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      var secret = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var CONFIG = this.CONFIG,
+          encode = this.encode,
           hmacSha256 = this.hmacSha256;
 
-      var encoding = 'base64';
+      var thisSecret = secret || CONFIG.JWT_SECRET;
+      var encoding = CONFIG.ENCODING;
       var header = {
         alg: 'HS256',
         typ: 'JWT'
@@ -100,31 +140,29 @@ var Argus = exports.Argus = function () {
 
       var jwtHeader = encode(JSON.stringify(header), encoding);
       var jwtClaims = encode(JSON.stringify(claims), encoding);
-      var jwtSignature = hmacSha256(jwtHeader + jwtClaims, secret);
+      var jwtSignature = hmacSha256(jwtHeader + jwtClaims, thisSecret);
 
       return [jwtHeader, jwtClaims, jwtSignature].join('.');
     }
   }, {
     key: 'decodeJWT',
     value: function decodeJWT(authToken) {
-      var decode = this.decode;
+      var CONFIG = this.CONFIG,
+          decode = this.decode;
 
-      var encoding = 'base64';
-      var error = void 0,
-          responseBody = void 0;
+      var encoding = CONFIG.ENCODING;
+      var error = void 0;
 
       if (!(authToken && authToken.length)) {
-        error = 'Missing/Invalid Authorization';
-        responseBody = new _ResponseBody.ResponseBody(401, error);
-        return responseBody;
+        error = new _ResponseBody.ResponseBody(401, 'Missing/Invalid Authorization');
+        return error;
       }
 
       var jwtArray = authToken && authToken.split('.');
 
       if (jwtArray.length !== 3) {
-        error = 'Invalid Authorization Token';
-        responseBody = new _ResponseBody.ResponseBody(400, error);
-        return responseBody;
+        error = new _ResponseBody.ResponseBody(400, 'Invalid Authorization Token');
+        return error;
       }
 
       var header = decode(jwtArray[0], encoding);
@@ -135,32 +173,33 @@ var Argus = exports.Argus = function () {
         header = JSON.parse(header);
         claims = JSON.parse(claims);
       } catch (e) {
-        error = 'Invalid Authorization Token';
-        responseBody = new _ResponseBody.ResponseBody(400, error);
-        return responseBody;
+        error = new _ResponseBody.ResponseBody(400, 'Invalid Authorization Token');
+        return error;
       }
 
       if (header.constructor.name !== 'Object' || claims.constructor.name !== 'Object') {
-        error = 'Invalid JWT Header/Claims';
-        responseBody = new _ResponseBody.ResponseBody(400, error);
-        return responseBody;
+        error = new _ResponseBody.ResponseBody(400, 'Invalid JWT Header/Claims');
+        return error;
       }
 
       return { header: header, claims: claims, signature: signature };
     }
   }, {
     key: 'verifyJWT',
-    value: function verifyJWT(decryptedJWT, secret) {
-      var encode = this.encode,
+    value: function verifyJWT(decryptedJWT) {
+      var secret = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var CONFIG = this.CONFIG,
+          encode = this.encode,
           hmacSha256 = this.hmacSha256;
 
-      var encoding = 'base64';
+      var thisSecret = secret || CONFIG.JWT_SECRET;
+      var encoding = CONFIG.ENCODING;
       var header = JSON.stringify(decryptedJWT.header);
       var claims = JSON.stringify(decryptedJWT.claims);
       var signature = decryptedJWT.signature;
 
       var hash = encode(header + claims, encoding);
-      hash = hmacSha256(hash, secret);
+      hash = hmacSha256(hash, thisSecret);
       return hash === signature;
     }
   }, {
@@ -168,12 +207,14 @@ var Argus = exports.Argus = function () {
     value: function encryptPayload() {
       var plainText = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
       var secretKey = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
-      var cipher = this.cipher;
+      var CONFIG = this.CONFIG,
+          cipher = this.cipher;
 
-      var algorithm = 'aes-256-cbc';
-      var key = secretKey.substring(16, 48);
-      var iv = _crypto2.default.randomBytes(IV_LENGTH);
-      var bufferFormat = 'hex';
+      var thisSecretKey = secretKey || CONFIG.ENCRYPTION_SECRET;
+      var algorithm = CONFIG.ENCRYPTION_ALGORITHM;
+      var key = thisSecretKey;
+      var iv = _crypto2.default.randomBytes(CONFIG.IV_LENGTH);
+      var bufferFormat = CONFIG.BUFFER_FORMAT;
       var encrypted = cipher(algorithm, plainText, key, iv, bufferFormat);
       var payload = iv.toString(bufferFormat) + ':' + encrypted;
       return payload;
@@ -183,8 +224,10 @@ var Argus = exports.Argus = function () {
     value: function decryptPayload() {
       var payload = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
       var secretKey = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
-      var decipher = this.decipher;
+      var CONFIG = this.CONFIG,
+          decipher = this.decipher;
 
+      var thisSecretKey = secretKey || CONFIG.ENCRYPTION_SECRET;
       if (!payload) {
         return;
       }
@@ -195,11 +238,11 @@ var Argus = exports.Argus = function () {
       }
 
       try {
-        var key = secretKey.substring(16, 48);
-        var algorithm = 'aes-256-cbc';
+        var key = thisSecretKey;
+        var algorithm = CONFIG.ENCRYPTION_ALGORITHM;
         var iv = payloadParts[0];
         var encryptedText = payloadParts[1];
-        var bufferFormat = 'hex';
+        var bufferFormat = CONFIG.BUFFER_FORMAT;
         var decrypted = decipher(algorithm, encryptedText, key, iv, bufferFormat);
         var _body = JSON.parse(decrypted);
         return _body;
@@ -213,13 +256,14 @@ var Argus = exports.Argus = function () {
       var _applySwitch;
 
       var _this = this;
-      var decodeJWT = _this.decodeJWT;
+      var decodeJWT = _this.decodeJWT,
+          _extractAuthToken = _this._extractAuthToken;
       var headers = request.headers,
           query = request.query;
       var authorization = headers.authorization;
       var token = query.token;
 
-      var authToken = authorization && authorization.split('Bearer ')[1] || token;
+      var authToken = _extractAuthToken(authorization) || token;
       request.token = authToken;
 
       var applySwitch = (_applySwitch = {}, _defineProperty(_applySwitch, SECURITY_TYPES.JWT, function () {
@@ -229,7 +273,7 @@ var Argus = exports.Argus = function () {
 
         request.jwt = jwt;
         request.user = claims;
-      }), _defineProperty(_applySwitch, SECURITY_TYPES.JWT_WITH_PAYLOAD_ENCRYPTION, function () {
+      }), _defineProperty(_applySwitch, SECURITY_TYPES.JWT_WITH_PAYLOAD_DECRYPTION, function () {
         var jwt = decodeJWT(authToken);
         var claims = jwt.claims;
 
@@ -393,8 +437,10 @@ var Argus = exports.Argus = function () {
     value: function hmacSha256() {
       var plainText = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
       var salt = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var CONFIG = this.CONFIG;
 
-      var hmac = _crypto2.default.createHmac('sha256', salt);
+      var thisSalt = salt || CONFIG.PASSWORD_SALT;
+      var hmac = _crypto2.default.createHmac('sha256', thisSalt);
       var hash = hmac.update(plainText, 'utf8').digest('base64');
       return hash;
     }
@@ -405,10 +451,14 @@ var Argus = exports.Argus = function () {
       var plainText = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
       var key = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '';
       var iv = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : '';
-      var bufferFormat = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 'hex';
+      var CONFIG = this.CONFIG;
 
-      var keyBuffer = Buffer.from(key);
-      var ivBuffer = Buffer.from(iv, bufferFormat);
+      var thisKey = key || CONFIG.ENCRYPTION_SECRET;
+      var thisIV = iv || CONFIG.IV;
+      var bufferFormat = CONFIG.BUFFER_FORMAT;
+
+      var keyBuffer = Buffer.from(thisKey);
+      var ivBuffer = Buffer.from(thisIV, bufferFormat);
       var cipher = _crypto2.default.createCipheriv(algorithm, keyBuffer, ivBuffer);
 
       var encrypted = cipher.update(plainText);
@@ -423,10 +473,14 @@ var Argus = exports.Argus = function () {
       var cipherText = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
       var key = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '';
       var iv = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : '';
-      var bufferFormat = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 'hex';
+      var CONFIG = this.CONFIG;
 
-      var keyBuffer = Buffer.from(key);
-      var ivBuffer = Buffer.from(iv, bufferFormat);
+      var thisKey = key || CONFIG.ENCRYPTION_SECRET;
+      var thisIV = iv || CONFIG.IV;
+      var bufferFormat = CONFIG.BUFFER_FORMAT;
+
+      var keyBuffer = Buffer.from(thisKey);
+      var ivBuffer = Buffer.from(thisIV, bufferFormat);
       var cipherBuffer = Buffer.from(cipherText, bufferFormat);
       var decipher = _crypto2.default.createDecipheriv(algorithm, keyBuffer, ivBuffer);
 
@@ -439,17 +493,107 @@ var Argus = exports.Argus = function () {
     key: 'encode',
     value: function encode() {
       var plainText = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
-      var encoding = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'base64';
+      var encoding = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var CONFIG = this.CONFIG;
 
-      return Buffer.from(plainText).toString(encoding);
+      var thisEncoding = encoding || CONFIG.ENCODING;
+      return Buffer.from(plainText).toString(thisEncoding);
     }
   }, {
     key: 'decode',
     value: function decode() {
       var cipherText = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
-      var encoding = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'base64';
+      var encoding = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var CONFIG = this.CONFIG;
 
-      return Buffer.from(cipherText, encoding).toString('utf8');
+      var thisEncoding = encoding || CONFIG.ENCODING;
+      return Buffer.from(cipherText, thisEncoding).toString('utf8');
+    }
+  }, {
+    key: 'decodeAuth',
+    value: function decodeAuth(authType, auth) {
+      var _extractAuthToken = this._extractAuthToken,
+          _decodeAuthToken = this._decodeAuthToken;
+
+      var error = void 0;
+
+      if (!AUTH_TYPES[authType]) {
+        error = new _ResponseBody.ResponseBody(400, 'Invalid \'authType\' for Decoding');
+        return error;
+      }
+
+      if (!auth) {
+        error = new _ResponseBody.ResponseBody(400, 'Auth Not Found');
+        return error;
+      }
+
+      var token = _extractAuthToken(auth);
+      if (!token) {
+        error = new _ResponseBody.ResponseBody(400, 'Invalid Auth');
+        return error;
+      }
+
+      var credentials = _decodeAuthToken(authType, token);
+      if (!credentials) {
+        error = new _ResponseBody.ResponseBody(400, 'Invalid Auth Credentials');
+        return error;
+      }
+
+      return credentials;
+    }
+  }, {
+    key: '_extractAuthToken',
+    value: function _extractAuthToken(auth) {
+      var parts = void 0,
+          token = void 0;
+
+      AUTH_SPLITERS.forEach(function (spliter) {
+        if (token) {
+          return;
+        }
+        parts = auth.split(spliter);
+        if (parts[0] === '' && parts[1]) {
+          token = parts[1];
+        }
+      });
+      return token;
+    }
+  }, {
+    key: '_decodeAuthToken',
+    value: function _decodeAuthToken(authType) {
+      var token = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+      var _decodeBasicAuthToken = this._decodeBasicAuthToken;
+
+      var credentials = void 0;
+      if (authType === AUTH_TYPES.BASIC) {
+        credentials = _decodeBasicAuthToken(token);
+      }
+      return credentials;
+    }
+  }, {
+    key: '_decodeBasicAuthToken',
+    value: function _decodeBasicAuthToken() {
+      var _credentials;
+
+      var token = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+      var CONFIG = this.CONFIG;
+      var USERNAME_PROP = CONFIG.USERNAME_PROP,
+          PASSWORD_PROP = CONFIG.PASSWORD_PROP;
+
+      var error = void 0,
+          credentialParts = void 0,
+          credentials = void 0;
+      var encoding = CONFIG.ENCODING;
+
+      credentialParts = this.decode(token, encoding);
+      credentialParts = credentialParts.split(':');
+      if (credentials.length !== 2) {
+        error = new _ResponseBody.ResponseBody(400, 'Invalid Auth Token');
+      }
+
+      credentials = (_credentials = {}, _defineProperty(_credentials, USERNAME_PROP, credentialParts[0]), _defineProperty(_credentials, PASSWORD_PROP, credentialParts[1]), _credentials);
+
+      return error || credentials;
     }
   }], [{
     key: 'SECURITY_TYPES',
@@ -457,7 +601,7 @@ var Argus = exports.Argus = function () {
       return SECURITY_TYPES;
     }
   }, {
-    key: '__version',
+    key: 'VERSION',
     get: function get() {
       return VERSION;
     }

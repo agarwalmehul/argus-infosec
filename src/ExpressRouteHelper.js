@@ -76,7 +76,8 @@ export class ExpressRouteHelper {
 
   sendEncryptedResponse (request, response, next) {
     const { sendResponse } = this
-    const responseBody = response.body
+    const { body = {} } = response
+    const responseBody = JSON.stringify(body)
     const encryptionKey = response._encryptionKey || request._encryptionKey
     const token = response.token || request.token
 

@@ -23,7 +23,9 @@ const DEFAULT_CONFIG = {
   IV_LENGTH: 16,
   ENCODING: 'base64',
   KEY_LENGTH: 16,
-  KEY_FORMAT: 'base64'
+  KEY_FORMAT: 'base64',
+  TOKEN_KEY_START_INDEX: 40,
+  TOKEN_KEY_END_INDEX: 72
 }
 
 export { SECURITY_TYPES as ARGUS_SECURITY_TYPES }
@@ -283,7 +285,9 @@ export class Argus {
 
         let { getEncryptionKey } = options
         const { token = '' } = request
-        const key = token && token.substring(16, 48)
+        const { CONFIG } = _this
+        const { TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX } = CONFIG
+        const key = token && token.substring(TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX)
         request._encryptionKey = key
 
         if (getEncryptionKey instanceof Function) {
@@ -438,7 +442,7 @@ export class Argus {
 
     credentialParts = this.decode(token, encoding)
     credentialParts = credentialParts.split(':')
-    if (credentials.length !== 2) {
+    if (credentialParts.length !== 2) {
       error = new ResponseBody(400, 'Invalid Auth Token')
     }
 

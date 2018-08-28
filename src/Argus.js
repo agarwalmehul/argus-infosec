@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.10'
+const VERSION = '0.1.11'
 const SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -227,13 +227,13 @@ export class Argus {
   validateSecurity (options = {}, request, response, callback) {
     const _this = this
     const { verifyJWT, decryptPayload, _getKeyFromToken } = _this
-    const { jwt, user = {}, body, _decryptPayload } = request
+    const { jwt = {}, user = {}, body, _decryptPayload } = request
     let err, responseBody
 
     async.waterfall([
       // Validate JWT and Body
       next => {
-        if (jwt instanceof ResponseBody) {
+        if (jwt.constructor.name === 'ResponseBody') {
           return process.nextTick(() => next(jwt))
         }
 
@@ -242,6 +242,8 @@ export class Argus {
           responseBody = new ResponseBody(500, err, body)
           return process.nextTick(() => next(responseBody))
         }
+
+        process.nextTick(next)
       },
 
       // Get User's Secret Key
@@ -319,7 +321,7 @@ export class Argus {
           return process.nextTick(() => next(err))
         } else {
           request.body = (_body && Object.assign({}, body, _body)) || {}
-          return process.nextTick(() => next())
+          return process.nextTick(next)
         }
       }
     ], error => {
@@ -453,7 +455,7 @@ export class Argus {
     return error || credentials
   }
 
-  _getKeyFromToken(token = '') {
+  _getKeyFromToken (token = '') {
     const { CONFIG } = this
     const { TOKEN_KEY_START_INDEX, TOKEN_KEY_END_INDEX } = CONFIG
     let key = ''

@@ -31,7 +31,7 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
 
     // Method Hard-binding
     this.applyJWT = this.applyJWT.bind(this);
-    this.applyJWTandDecryptPayload = this.applyJWTandDecryptPayload.bind(this);
+    this.applyJWTwithPayloadDecryption = this.applyJWTwithPayloadDecryption.bind(this);
     this.validateSecurity = this.validateSecurity.bind(this);
 
     this.manageSelfAccess = this.manageSelfAccess.bind(this);
@@ -49,8 +49,8 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
       this.argus.applySecurity(_Argus.ARGUS_SECURITY_TYPES.JWT, request, response, next);
     }
   }, {
-    key: 'applyJWTandDecryptPayload',
-    value: function applyJWTandDecryptPayload(request, response, next) {
+    key: 'applyJWTwithPayloadDecryption',
+    value: function applyJWTwithPayloadDecryption(request, response, next) {
       this.argus.applySecurity(_Argus.ARGUS_SECURITY_TYPES.JWT_WITH_PAYLOAD_DECRYPTION, request, response, next);
     }
   }, {
@@ -129,8 +129,7 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
   }, {
     key: 'decodeBasicAuth',
     value: function decodeBasicAuth(request, response, next) {
-      var headers = request.headers,
-          body = request.body;
+      var headers = request.headers;
       var authorization = headers.authorization;
 
       var authType = _Argus.ARGUS_AUTH_TYPES.BASIC;

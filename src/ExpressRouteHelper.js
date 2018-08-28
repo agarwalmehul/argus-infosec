@@ -15,7 +15,7 @@ export class ExpressRouteHelper {
 
     // Method Hard-binding
     this.applyJWT = this.applyJWT.bind(this)
-    this.applyJWTandDecryptPayload = this.applyJWTandDecryptPayload.bind(this)
+    this.applyJWTwithPayloadDecryption = this.applyJWTwithPayloadDecryption.bind(this)
     this.validateSecurity = this.validateSecurity.bind(this)
 
     this.manageSelfAccess = this.manageSelfAccess.bind(this)
@@ -31,7 +31,7 @@ export class ExpressRouteHelper {
     this.argus.applySecurity(ARGUS_SECURITY_TYPES.JWT, request, response, next)
   }
 
-  applyJWTandDecryptPayload (request, response, next) {
+  applyJWTwithPayloadDecryption (request, response, next) {
     this.argus.applySecurity(ARGUS_SECURITY_TYPES.JWT_WITH_PAYLOAD_DECRYPTION, request, response, next)
   }
 
@@ -89,7 +89,7 @@ export class ExpressRouteHelper {
   }
 
   decodeBasicAuth (request, response, next) {
-    const { headers, body } = request
+    const { headers } = request
     const { authorization } = headers
     const authType = ARGUS_AUTH_TYPES.BASIC
     const credentials = this.argus.decodeAuth(authType, authorization)

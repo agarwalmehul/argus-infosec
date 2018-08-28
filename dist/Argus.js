@@ -23,7 +23,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var VERSION = '0.1.10';
+var VERSION = '0.1.11';
 var SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -305,7 +305,8 @@ var Argus = exports.Argus = function () {
       var verifyJWT = _this.verifyJWT,
           decryptPayload = _this.decryptPayload,
           _getKeyFromToken = _this._getKeyFromToken;
-      var jwt = request.jwt,
+      var _request$jwt = request.jwt,
+          jwt = _request$jwt === undefined ? {} : _request$jwt,
           _request$user = request.user,
           user = _request$user === undefined ? {} : _request$user,
           body = request.body,
@@ -317,7 +318,7 @@ var Argus = exports.Argus = function () {
       _async2.default.waterfall([
       // Validate JWT and Body
       function (next) {
-        if (jwt instanceof _ResponseBody.ResponseBody) {
+        if (jwt.constructor.name === 'ResponseBody') {
           return process.nextTick(function () {
             return next(jwt);
           });
@@ -330,6 +331,8 @@ var Argus = exports.Argus = function () {
             return next(responseBody);
           });
         }
+
+        process.nextTick(next);
       },
 
       // Get User's Secret Key
@@ -425,9 +428,7 @@ var Argus = exports.Argus = function () {
           });
         } else {
           request.body = _body && Object.assign({}, body, _body) || {};
-          return process.nextTick(function () {
-            return next();
-          });
+          return process.nextTick(next);
         }
       }], function (error) {
         if (error) {

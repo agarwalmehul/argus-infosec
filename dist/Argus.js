@@ -23,7 +23,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var VERSION = '0.1.12';
+var VERSION = '0.1.13';
 var SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -189,7 +189,8 @@ var Argus = exports.Argus = function () {
     }
   }, {
     key: 'verifyJWT',
-    value: function verifyJWT(decryptedJWT) {
+    value: function verifyJWT() {
+      var decryptedJWT = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
       var secret = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
       var CONFIG = this.CONFIG,
           encode = this.encode,
@@ -551,7 +552,9 @@ var Argus = exports.Argus = function () {
     }
   }, {
     key: '_extractAuthToken',
-    value: function _extractAuthToken(auth) {
+    value: function _extractAuthToken() {
+      var auth = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+
       var parts = void 0,
           token = void 0;
 
@@ -568,7 +571,8 @@ var Argus = exports.Argus = function () {
     }
   }, {
     key: '_decodeAuthToken',
-    value: function _decodeAuthToken(authType) {
+    value: function _decodeAuthToken() {
+      var authType = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
       var token = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
       var _decodeBasicAuthToken = this._decodeBasicAuthToken;
 

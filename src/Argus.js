@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.12'
+const VERSION = '0.1.13'
 const SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')
@@ -141,7 +141,7 @@ export class Argus {
     return { header, claims, signature }
   }
 
-  verifyJWT (decryptedJWT, secret = '') {
+  verifyJWT (decryptedJWT = {}, secret = '') {
     const { CONFIG, encode, hmacSha256 } = this
     const thisSecret = secret || CONFIG.JWT_SECRET
     const encoding = CONFIG.ENCODING
@@ -413,7 +413,7 @@ export class Argus {
     return credentials
   }
 
-  _extractAuthToken (auth) {
+  _extractAuthToken (auth = '') {
     let parts, token
 
     AUTH_SPLITERS.forEach(spliter => {
@@ -426,7 +426,7 @@ export class Argus {
     return token
   }
 
-  _decodeAuthToken (authType, token = '') {
+  _decodeAuthToken (authType = '', token = '') {
     const { _decodeBasicAuthToken } = this
     let credentials
     if (authType === AUTH_TYPES.BASIC) {

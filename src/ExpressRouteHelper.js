@@ -85,7 +85,8 @@ export class ExpressRouteHelper {
 
     const payload = this.argus.encryptPayload(responseBody, encryptionKey)
     const _body = { token, payload }
-    response.status(200).json(_body)
+    const _responseBody = new ResponseBody(200, 'OK', _body)
+    response.status(_responseBody.statusCode).json(_responseBody)
   }
 
   decodeBasicAuth (request, response, next) {

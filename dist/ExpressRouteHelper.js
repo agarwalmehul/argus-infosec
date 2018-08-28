@@ -124,7 +124,8 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
 
       var payload = this.argus.encryptPayload(responseBody, encryptionKey);
       var _body = { token: token, payload: payload };
-      response.status(200).json(_body);
+      var _responseBody = new _ResponseBody.ResponseBody(200, 'OK', _body);
+      response.status(_responseBody.statusCode).json(_responseBody);
     }
   }, {
     key: 'decodeBasicAuth',

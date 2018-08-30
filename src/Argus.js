@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import async from 'async'
 import { ResponseBody } from './ResponseBody'
 
-const VERSION = '0.1.13'
+const VERSION = '0.1.14'
 const SECURITY_TYPES = {
   JWT: Symbol('JWT'),
   JWT_WITH_PAYLOAD_DECRYPTION: Symbol('JWT_WITH_PAYLOAD_DECRYPTION')

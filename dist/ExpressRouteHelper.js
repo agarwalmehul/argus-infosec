@@ -41,6 +41,7 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
     this.sendEncryptedResponse = this.sendEncryptedResponse.bind(this);
 
     this.decodeBasicAuth = this.decodeBasicAuth.bind(this);
+    this.hideServerDetails = this.hideServerDetails.bind(this);
   }
 
   _createClass(ExpressRouteHelper, [{
@@ -137,6 +138,17 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
       var credentials = this.argus.decodeAuth(authType, authorization);
       request.body = credentials;
       process.nextTick(next);
+    }
+  }, {
+    key: 'hideServerDetails',
+    value: function hideServerDetails(app) {
+      if (!app || !app.disable) {
+        console.error('[Error] Failed to Hide Server Details');
+        return process.exit(1);
+      }
+
+      app.disable('etag');
+      app.disable('x-powered-by');
     }
   }]);
 

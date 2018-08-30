@@ -25,6 +25,7 @@ export class ExpressRouteHelper {
     this.sendEncryptedResponse = this.sendEncryptedResponse.bind(this)
 
     this.decodeBasicAuth = this.decodeBasicAuth.bind(this)
+    this.hideServerDetails = this.hideServerDetails.bind(this)
   }
 
   applyJWT (request, response, next) {
@@ -96,5 +97,15 @@ export class ExpressRouteHelper {
     const credentials = this.argus.decodeAuth(authType, authorization)
     request.body = credentials
     process.nextTick(next)
+  }
+
+  hideServerDetails (app) {
+    if (!app || !app.disable) {
+      console.error('[Error] Failed to Hide Server Details');
+      return process.exit(1);
+    }
+
+    app.disable('etag')
+    app.disable('x-powered-by')
   }
 }

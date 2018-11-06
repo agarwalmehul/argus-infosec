@@ -82,6 +82,8 @@ var Argus = exports.Argus = function () {
 
     this.encode = this.encode.bind(this);
     this.decode = this.decode.bind(this);
+    this.urlEncode = this.urlEncode.bind(this);
+    this.urlDecode = this.urlDecode.bind(this);
 
     this.decodeAuth = this.decodeAuth.bind(this);
     this._extractAuthToken = this._extractAuthToken.bind(this);
@@ -132,6 +134,7 @@ var Argus = exports.Argus = function () {
       var secret = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
       var CONFIG = this.CONFIG,
           encode = this.encode,
+          urlEncode = this.urlEncode,
           hmacSha256 = this.hmacSha256;
 
       var thisSecret = secret || CONFIG.JWT_SECRET;
@@ -142,16 +145,23 @@ var Argus = exports.Argus = function () {
       };
 
       var jwtHeader = encode(JSON.stringify(header), encoding);
+      jwtHeader = urlEncode(jwtHeader);
+
       var jwtClaims = encode(JSON.stringify(claims), encoding);
-      var jwtSignature = hmacSha256(jwtHeader + jwtClaims, thisSecret);
+      jwtClaims = urlEncode(jwtClaims);
+
+      var jwtSignature = hmacSha256(jwtHeader + '.' + jwtClaims, thisSecret);
+      jwtSignature = urlEncode(jwtSignature);
 
       return [jwtHeader, jwtClaims, jwtSignature].join('.');
     }
   }, {
     key: 'decodeJWT',
-    value: function decodeJWT(authToken) {
+    value: function decodeJWT() {
+      var authToken = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
       var CONFIG = this.CONFIG,
-          decode = this.decode;
+          decode = this.decode,
+          urlDecode = this.urlDecode;
 
       var encoding = CONFIG.ENCODING;
       var error = void 0;
@@ -168,9 +178,13 @@ var Argus = exports.Argus = function () {
         return error;
       }
 
-      var header = decode(jwtArray[0], encoding);
-      var claims = decode(jwtArray[1], encoding);
-      var signature = jwtArray[2];
+      var header = urlDecode(jwtArray[0]);
+      header = decode(header, encoding);
+
+      var claims = urlDecode(jwtArray[1]);
+      claims = decode(claims, encoding);
+
+      var signature = urlDecode(jwtArray[2]);
 
       try {
         header = JSON.parse(header);
@@ -194,16 +208,26 @@ var Argus = exports.Argus = function () {
       var secret = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
       var CONFIG = this.CONFIG,
           encode = this.encode,
+          urlEncode = this.urlEncode,
           hmacSha256 = this.hmacSha256;
 
       var thisSecret = secret || CONFIG.JWT_SECRET;
       var encoding = CONFIG.ENCODING;
-      var header = JSON.stringify(decryptedJWT.header);
-      var claims = JSON.stringify(decryptedJWT.claims);
-      var signature = decryptedJWT.signature;
 
-      var hash = encode(header + claims, encoding);
-      hash = hmacSha256(hash, thisSecret);
+      var header = JSON.stringify(decryptedJWT.header);
+      header = encode(header, encoding);
+      header = urlEncode(header);
+
+      var claims = JSON.stringify(decryptedJWT.claims);
+      claims = encode(claims, encoding);
+      claims = urlEncode(claims);
+
+      var signature = decryptedJWT.signature;
+      signature = urlEncode(signature);
+
+      var hash = hmacSha256(header + '.' + claims, thisSecret);
+      hash = urlEncode(hash);
+
       return hash === signature;
     }
   }, {
@@ -514,6 +538,21 @@ var Argus = exports.Argus = function () {
 
       var thisEncoding = encoding || CONFIG.ENCODING;
       return Buffer.from(cipherText, thisEncoding).toString('utf8');
+    }
+  }, {
+    key: 'urlEncode',
+    value: function urlEncode(encoded) {
+      var urlEncoded = encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return urlEncoded;
+    }
+  }, {
+    key: 'urlDecode',
+    value: function urlDecode(urlEncoded) {
+      var urlDecoded = urlEncoded.replace(/-/g, '+').replace(/_/g, '/');
+      while (urlDecoded.length % 4) {
+        urlDecoded += '=';
+      }
+      return urlDecoded;
     }
   }, {
     key: 'decodeAuth',

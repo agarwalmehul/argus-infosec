@@ -57,6 +57,8 @@ export class Argus {
 
     this.encode = this.encode.bind(this)
     this.decode = this.decode.bind(this)
+    this.urlEncode = this.urlEncode.bind(this)
+    this.urlDecode = this.urlDecode.bind(this)
 
     this.decodeAuth = this.decodeAuth.bind(this)
     this._extractAuthToken = this._extractAuthToken.bind(this)
@@ -89,7 +91,7 @@ export class Argus {
   }
 
   createJWT (claims = {}, secret = '') {
-    const { CONFIG, encode, hmacSha256 } = this
+    const { CONFIG, encode, urlEncode, hmacSha256 } = this
     const thisSecret = secret || CONFIG.JWT_SECRET
     const encoding = CONFIG.ENCODING
     const header = {
@@ -97,15 +99,20 @@ export class Argus {
       typ: 'JWT'
     }
 
-    const jwtHeader = encode(JSON.stringify(header), encoding)
-    const jwtClaims = encode(JSON.stringify(claims), encoding)
-    const jwtSignature = hmacSha256((jwtHeader + jwtClaims), thisSecret)
+    let jwtHeader = encode(JSON.stringify(header), encoding)
+    jwtHeader = urlEncode(jwtHeader)
+
+    let jwtClaims = encode(JSON.stringify(claims), encoding)
+    jwtClaims = urlEncode(jwtClaims)
+
+    let jwtSignature = hmacSha256((jwtHeader + '.' + jwtClaims), thisSecret)
+    jwtSignature = urlEncode(jwtSignature)
 
     return [jwtHeader, jwtClaims, jwtSignature].join('.')
   }
 
-  decodeJWT (authToken) {
-    const { CONFIG, decode } = this
+  decodeJWT (authToken = '') {
+    const { CONFIG, decode, urlDecode } = this
     const encoding = CONFIG.ENCODING
     let error
 
@@ -121,9 +128,13 @@ export class Argus {
       return error
     }
 
-    let header = decode(jwtArray[0], encoding)
-    let claims = decode(jwtArray[1], encoding)
-    let signature = jwtArray[2]
+    let header = urlDecode(jwtArray[0])
+    header = decode(header, encoding)
+
+    let claims = urlDecode(jwtArray[1])
+    claims = decode(claims, encoding)
+
+    let signature = urlDecode(jwtArray[2])
 
     try {
       header = JSON.parse(header)
@@ -142,15 +153,24 @@ export class Argus {
   }
 
   verifyJWT (decryptedJWT = {}, secret = '') {
-    const { CONFIG, encode, hmacSha256 } = this
+    const { CONFIG, encode, urlEncode, hmacSha256 } = this
     const thisSecret = secret || CONFIG.JWT_SECRET
     const encoding = CONFIG.ENCODING
-    const header = JSON.stringify(decryptedJWT.header)
-    const claims = JSON.stringify(decryptedJWT.claims)
-    const signature = decryptedJWT.signature
 
-    let hash = encode((header + claims), encoding)
-    hash = hmacSha256(hash, thisSecret)
+    let header = JSON.stringify(decryptedJWT.header)
+    header = encode(header, encoding)
+    header = urlEncode(header)
+
+    let claims = JSON.stringify(decryptedJWT.claims)
+    claims = encode(claims, encoding)
+    claims = urlEncode(claims)
+
+    let signature = decryptedJWT.signature
+    signature = urlEncode(signature)
+
+    let hash = hmacSha256((header + '.' + claims), thisSecret)
+    hash = urlEncode(hash)
+
     return hash === signature
   }
 
@@ -381,6 +401,17 @@ export class Argus {
     const { CONFIG } = this
     const thisEncoding = encoding || CONFIG.ENCODING
     return Buffer.from(cipherText, thisEncoding).toString('utf8')
+  }
+
+  urlEncode (encoded) {
+    const urlEncoded = encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    return urlEncoded
+  }
+
+  urlDecode (urlEncoded) {
+    let urlDecoded = urlEncoded.replace(/-/g, '+').replace(/_/g, '/')
+    while (urlDecoded.length % 4) { urlDecoded += '=' }
+    return urlDecoded
   }
 
   decodeAuth (authType, auth) {

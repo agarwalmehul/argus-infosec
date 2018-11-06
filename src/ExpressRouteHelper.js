@@ -71,7 +71,7 @@ export class ExpressRouteHelper {
   }
 
   sendResponse (request, response, next) {
-    const { body } = response
+    const { body = {} } = response
     response.status(body.statusCode).json(body)
   }
 
@@ -101,8 +101,8 @@ export class ExpressRouteHelper {
 
   hideServerDetails (app) {
     if (!app || !app.disable) {
-      console.error('[Error] Failed to Hide Server Details');
-      return process.exit(1);
+      console.error('[Error] Failed to Hide Server Details')
+      return process.exit(1)
     }
 
     app.disable('etag')

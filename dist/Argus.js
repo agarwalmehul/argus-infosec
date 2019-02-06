@@ -236,13 +236,14 @@ var Argus = exports.Argus = function () {
       var plainText = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
       var secretKey = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
       var CONFIG = this.CONFIG,
+          generateKey = this.generateKey,
           cipher = this.cipher;
 
       var thisSecretKey = secretKey || CONFIG.ENCRYPTION_SECRET;
       var algorithm = CONFIG.ENCRYPTION_ALGORITHM;
       var key = thisSecretKey;
-      var iv = _crypto2.default.randomBytes(CONFIG.IV_LENGTH);
       var bufferFormat = CONFIG.BUFFER_FORMAT;
+      var iv = generateKey(CONFIG.IV_LENGTH, bufferFormat).substring(0, CONFIG.IV_LENGTH);
       var encrypted = cipher(algorithm, plainText, key, iv, bufferFormat);
       var payload = iv.toString(bufferFormat) + ':' + encrypted;
       return payload;
@@ -488,7 +489,7 @@ var Argus = exports.Argus = function () {
       var bufferFormat = CONFIG.BUFFER_FORMAT;
 
       var keyBuffer = Buffer.from(thisKey);
-      var ivBuffer = Buffer.from(thisIV, bufferFormat);
+      var ivBuffer = Buffer.from(thisIV);
       var cipher = _crypto2.default.createCipheriv(algorithm, keyBuffer, ivBuffer);
 
       var encrypted = cipher.update(plainText);
@@ -510,7 +511,7 @@ var Argus = exports.Argus = function () {
       var bufferFormat = CONFIG.BUFFER_FORMAT;
 
       var keyBuffer = Buffer.from(thisKey);
-      var ivBuffer = Buffer.from(thisIV, bufferFormat);
+      var ivBuffer = Buffer.from(thisIV);
       var cipherBuffer = Buffer.from(cipherText, bufferFormat);
       var decipher = _crypto2.default.createDecipheriv(algorithm, keyBuffer, ivBuffer);
 

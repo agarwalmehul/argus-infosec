@@ -175,12 +175,12 @@ export class Argus {
   }
 
   encryptPayload (plainText = '', secretKey = '') {
-    const { CONFIG, cipher } = this
+    const { CONFIG, generateKey, cipher } = this
     const thisSecretKey = secretKey || CONFIG.ENCRYPTION_SECRET
     const algorithm = CONFIG.ENCRYPTION_ALGORITHM
     const key = thisSecretKey
-    const iv = crypto.randomBytes(CONFIG.IV_LENGTH)
     const bufferFormat = CONFIG.BUFFER_FORMAT
+    const iv = generateKey(CONFIG.IV_LENGTH, bufferFormat).substring(0, CONFIG.IV_LENGTH)
     const encrypted = cipher(algorithm, plainText, key, iv, bufferFormat)
     const payload = iv.toString(bufferFormat) + ':' + encrypted
     return payload
@@ -365,7 +365,7 @@ export class Argus {
     const bufferFormat = CONFIG.BUFFER_FORMAT
 
     let keyBuffer = Buffer.from(thisKey)
-    let ivBuffer = Buffer.from(thisIV, bufferFormat)
+    let ivBuffer = Buffer.from(thisIV)
     let cipher = crypto.createCipheriv(algorithm, keyBuffer, ivBuffer)
 
     let encrypted = cipher.update(plainText)
@@ -381,7 +381,7 @@ export class Argus {
     const bufferFormat = CONFIG.BUFFER_FORMAT
 
     let keyBuffer = Buffer.from(thisKey)
-    let ivBuffer = Buffer.from(thisIV, bufferFormat)
+    let ivBuffer = Buffer.from(thisIV)
     let cipherBuffer = Buffer.from(cipherText, bufferFormat)
     let decipher = crypto.createDecipheriv(algorithm, keyBuffer, ivBuffer)
 

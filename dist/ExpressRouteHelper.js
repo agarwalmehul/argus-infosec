@@ -106,6 +106,12 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
     value: function sendResponse(request, response, next) {
       var _response$body = response.body,
           body = _response$body === undefined ? {} : _response$body;
+      var statusCode = body.statusCode;
+
+
+      if (!statusCode) {
+        return process.nextTick(next);
+      }
 
       response.status(body.statusCode).json(body);
     }
@@ -115,6 +121,12 @@ var ExpressRouteHelper = exports.ExpressRouteHelper = function () {
       var sendResponse = this.sendResponse;
       var _response$body2 = response.body,
           body = _response$body2 === undefined ? {} : _response$body2;
+      var statusCode = body.statusCode;
+
+
+      if (!statusCode) {
+        return process.nextTick(next);
+      }
 
       var responseBody = JSON.stringify(body);
       var encryptionKey = response._encryptionKey || request._encryptionKey;
